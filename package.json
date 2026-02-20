@@ -1,8 +1,0 @@
-{
-  "name": "grocery-bills",
-  "version": "1.0.0",
-  "description": "Grocery bill tracker with Vercel Postgres",
-  "dependencies": {
-    "@neondatabase/serverless": "^0.10.0"
-  }
-}
