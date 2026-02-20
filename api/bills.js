@@ -1,4 +1,6 @@
-import { sql } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.DATABASE_URL);
 
 export default async function handler(req, res) {
   // Allow CORS
@@ -20,13 +22,13 @@ export default async function handler(req, res) {
     `;
 
     if (req.method === 'GET') {
-      const { rows } = await sql`SELECT * FROM bills ORDER BY date ASC, created_at ASC`;
+      const rows = await sql`SELECT * FROM bills ORDER BY date ASC, created_at ASC`;
       return res.status(200).json(rows);
     }
 
     if (req.method === 'POST') {
       const { date, item, amount } = req.body;
-      const { rows } = await sql`
+      const rows = await sql`
         INSERT INTO bills (date, item, amount)
         VALUES (${date}, ${item}, ${amount})
         RETURNING *
