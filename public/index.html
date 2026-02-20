@@ -579,13 +579,18 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date, item, amount })
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Server error: ' + res.status);
+      }
       const newRecord = await res.json();
       records.push(newRecord);
       document.getElementById('f-item').value = '';
       document.getElementById('f-amount').value = '';
       render();
     } catch(e) {
-      alert('Failed to save. Please try again.');
+      console.error('Save failed:', e);
+      alert('Failed to save: ' + e.message);
     }
     btn.textContent = '＋ Add Entry';
     btn.disabled = false;
