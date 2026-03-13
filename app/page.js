@@ -38,6 +38,17 @@ const styles = `
   .btn-save { background: var(--accent); color: white; border: none; border-radius: 7px; padding: 9px 20px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; }
   .btn-save:hover { opacity: 0.85; }
   .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-pagination { background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 6px 12px; font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+  .btn-pagination:hover:not(:disabled) { background: var(--accent-light); }
+  .btn-pagination:disabled { opacity: 0.4; cursor: not-allowed; }
+  .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
+  .recent-bills-block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); margin-bottom: 20px; animation: up 0.3s ease both; }
+  .recent-bills-header { padding: 14px 20px; background: #f3f1ee; border-bottom: 1px solid var(--border); font-family: 'DM Serif Display', serif; font-size: 16px; color: var(--text); }
+  .bill-row { display: grid; grid-template-columns: 1fr 80px 60px; padding: 11px 20px; border-bottom: 1px solid var(--border); align-items: center; gap: 10px; }
+  .bill-row:last-child { border-bottom: none; }
+  .bill-date { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+  .bill-item { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text); font-weight: 500; }
+  .bill-amount { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; text-align: right; color: var(--text); }
   .month-block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); margin-bottom: 16px; animation: up 0.3s ease both; }
   .month-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: #f3f1ee; border-bottom: 1px solid var(--border); }
   .month-title { font-family: 'DM Serif Display', serif; font-size: 16px; color: var(--text); }
@@ -63,13 +74,19 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [monthPage, setMonthPage] = useState(0);
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({ date: today, item: '', amount: '' });
 
   useEffect(() => {
     fetch('/api/bills')
       .then(r => r.json())
-      .then(data => { setRecords(Array.isArray(data) ? data : []); setLoading(false); })
+      .then(data => { 
+        const sortedData = Array.isArray(data) ? data : [];
+        sortedData.reverse();
+        setRecords(sortedData); 
+        setLoading(false); 
+      })
       .catch(() => { setError('Failed to load records.'); setLoading(false); });
   }, []);
 
@@ -98,6 +115,9 @@ export default function Home() {
   const avg = records.length ? total / records.length : 0;
   const max = records.length ? Math.max(...records.map(r => parseFloat(r.amount))) : 0;
 
+  // Get last 5 bills (most recent first)
+  const recentBills = records.slice(0, 5);
+
   // Group by month
   const byMonth = {};
   records.forEach(r => {
@@ -105,6 +125,15 @@ export default function Home() {
     if (!byMonth[key]) byMonth[key] = [];
     byMonth[key].push(r);
   });
+
+  // Get all unique months sorted in descending order
+  const allMonths = Object.keys(byMonth).sort().reverse();
+  
+  // Get only last 2 months for monthly summary
+  const visibleMonths = allMonths.slice(monthPage * 2, monthPage * 2 + 2);
+  
+  // Calculate pagination info
+  const totalPages = Math.ceil(allMonths.length / 2);
 
   return (
     <>
@@ -162,6 +191,28 @@ export default function Home() {
           </div>
         </div>
 
+        {!loading && recentBills.length > 0 && (
+          <>
+            <div className="section-header">
+              <span className="section-title">Recent Bills</span>
+            </div>
+            <div className="recent-bills-block">
+              <div className="recent-bills-header">最近 {Math.min(5, recentBills.length)} 条记录</div>
+              {recentBills.map((bill, idx) => (
+                <div className="bill-row" key={idx}>
+                  <div>
+                    <div className="bill-item">{bill.item}</div>
+                    <div className="bill-date">{new Date(bill.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', year: '2-digit' })}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="bill-amount">{fmt(bill.amount)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
         <div className="section-header">
           <span className="section-title">Monthly Summary</span>
         </div>
@@ -175,7 +226,7 @@ export default function Home() {
           </div>
         )}
 
-        {Object.keys(byMonth).sort().map(monthKey => {
+        {visibleMonths.map(monthKey => {
           const entries = byMonth[monthKey];
           const monthTotal = entries.reduce((s, r) => s + parseFloat(r.amount), 0);
           const byItem = {};
@@ -205,6 +256,28 @@ export default function Home() {
             </div>
           );
         })}
+
+        {!loading && records.length > 0 && allMonths.length > 2 && (
+          <div className="pagination">
+            <button 
+              className="btn-pagination" 
+              onClick={() => setMonthPage(p => Math.max(0, p - 1))}
+              disabled={monthPage === 0}
+            >
+              ← 上个月份
+            </button>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '12px', color: '#9a9590', alignSelf: 'center' }}>
+              {monthPage + 1} / {totalPages}
+            </span>
+            <button 
+              className="btn-pagination" 
+              onClick={() => setMonthPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={monthPage >= totalPages - 1}
+            >
+              下个月份 →
+            </button>
+          </div>
+        )}
 
         {records.length > 0 && (
           <div className="grand-total-block">
